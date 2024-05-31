@@ -84,7 +84,7 @@ void partial_insertion_sort(ExtMove* begin, ExtMove* end, int limit) {
 // move ordering is at the current node.
 
 // MovePicker constructor for the main search
-MovePicker::MovePicker(const Position&              p,
+MovePicker::MovePicker(Position&                    p,
                        Move                         ttm,
                        Depth                        d,
                        const ButterflyHistory*      mh,
@@ -92,12 +92,14 @@ MovePicker::MovePicker(const Position&              p,
                        const PieceToHistory**       ch,
                        const PawnHistory*           ph,
                        Move                         cm,
-                       const Move*                  killers) :
+                       const Move*                  killers,
+                       const CounterMoveHistory*    cmh) :
     pos(p),
     mainHistory(mh),
     captureHistory(cph),
     continuationHistory(ch),
     pawnHistory(ph),
+    counterMoves(cmh),
     ttMove(ttm),
     refutations{{killers[0], 0}, {killers[1], 0}, {cm, 0}},
     depth(d) {
@@ -107,7 +109,7 @@ MovePicker::MovePicker(const Position&              p,
 }
 
 // Constructor for quiescence search
-MovePicker::MovePicker(const Position&              p,
+MovePicker::MovePicker(Position&                    p,
                        Move                         ttm,
                        Depth                        d,
                        const ButterflyHistory*      mh,
@@ -128,7 +130,7 @@ MovePicker::MovePicker(const Position&              p,
 
 // Constructor for ProbCut: we generate captures with SEE greater
 // than or equal to the given threshold.
-MovePicker::MovePicker(const Position& p, Move ttm, int th, const CapturePieceToHistory* cph) :
+MovePicker::MovePicker(Position& p, Move ttm, int th, const CapturePieceToHistory* cph) :
     pos(p),
     captureHistory(cph),
     ttMove(ttm),
@@ -176,6 +178,7 @@ void MovePicker::score() {
             PieceType pt   = type_of(pc);
             Square    from = m.from_sq();
             Square    to   = m.to_sq();
+            Move      cm   = (*counterMoves)[pc][to];
 
             // histories
             m.value = 2 * (*mainHistory)[pos.side_to_move()][m.from_to()];
@@ -189,6 +192,14 @@ void MovePicker::score() {
             // bonus for checks
             m.value += bool(pos.check_squares(pt) & to) * 16384;
 
+            if (cm != Move::none())
+            {
+                StateInfo si;
+                pos.do_move(m, si);
+                if (pos.pseudo_legal(cm))
+                    m.value -= (*mainHistory)[~pos.side_to_move()][cm.from_to()] / 8;
+                pos.undo_move(m);
+            }
             // bonus for escaping from capture
             m.value += threatenedPieces & from ? (pt == QUEEN && !(to & threatenedByRook)   ? 51700
                                                   : pt == ROOK && !(to & threatenedByMinor) ? 25600
