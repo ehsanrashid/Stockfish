@@ -157,11 +157,6 @@ void MovePicker::score() {
         threatenedByMinor =
           pos.attacks_by<KNIGHT>(~us) | pos.attacks_by<BISHOP>(~us) | threatenedByPawn;
         threatenedByRook = pos.attacks_by<ROOK>(~us) | threatenedByMinor;
-
-        // Pieces threatened by pieces of lesser material value
-        threatenedPieces = (pos.pieces(us, QUEEN) & threatenedByRook)
-                         | (pos.pieces(us, ROOK) & threatenedByMinor)
-                         | (pos.pieces(us, KNIGHT, BISHOP) & threatenedByPawn);
     }
 
     for (auto& m : *this)
@@ -174,7 +169,6 @@ void MovePicker::score() {
         {
             Piece     pc   = pos.moved_piece(m);
             PieceType pt   = type_of(pc);
-            Square    from = m.from_sq();
             Square    to   = m.to_sq();
 
             // histories
@@ -193,19 +187,14 @@ void MovePicker::score() {
                 continue;
 
             // bonus for escaping from capture
-            m.value += threatenedPieces & from ? (pt == QUEEN && !(to & threatenedByRook)   ? 51700
-                                                  : pt == ROOK && !(to & threatenedByMinor) ? 25600
-                                                  : !(to & threatenedByPawn)                ? 14450
-                                                                                            : 0)
-                                               : 0;
+            m.value += pt == QUEEN ? !(to & threatenedByRook) * 51700
+                     : pt == ROOK  ? !(to & threatenedByMinor) * 25600
+                                   : !(to & threatenedByPawn) * 14450 / (1 + (pt == PAWN));
 
             // malus for putting piece en prise
-            m.value -= pt == QUEEN
-                       ? bool(to & threatenedByRook) * 28500 + bool(to & threatenedByMinor) * 10400
-                           + bool(to & threatenedByPawn) * 10150
-                     : pt == ROOK
-                       ? bool(to & threatenedByMinor) * 15250 + bool(to & threatenedByPawn) * 10050
-                       : bool(to & threatenedByPawn) * 14900 / (1 + (pt == PAWN));
+            m.value -= pt == QUEEN ? bool(to & threatenedByRook) * 49000
+                     : pt == ROOK  ? bool(to & threatenedByMinor) * 24335
+                                   : bool(to & threatenedByPawn) * 14900 / (1 + (pt == PAWN));
         }
 
         else  // Type == EVASIONS
