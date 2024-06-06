@@ -734,7 +734,7 @@ Value Search::Worker::search(
         unadjustedStaticEval =
           (ss - 1)->currentMove != Move::null()
             ? evaluate(networks[numaAccessToken], pos, refreshTable, thisThread->optimism[us])
-            : -(ss - 1)->staticEval + 120;
+            : -(ss - 1)->staticEval;
         ss->staticEval = eval = to_corrected_static_eval(unadjustedStaticEval, *thisThread, pos);
 
         // Static evaluation is saved as it was before adjustment by correction history
